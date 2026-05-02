@@ -1,0 +1,22 @@
+{% extends "auth_layout.html" %}
+
+{% block title %}IdeaHub{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+  <div class="login-card landing-card">
+    <div class="text-center mb-4">
+      <i class="bi bi-lightbulb-fill logo-icon"></i>
+      <h1 class="brand-title mt-2 mb-2">IdeaHub</h1>
+      <p class="brand-subtitle mb-0">
+        Smart workspace for students and teams to work, focus, and collaborate.
+      </p>
+    </div>
+
+    <div class="d-grid gap-2 mt-4">
+      <a href="/login" class="btn btn-login w-100">Login</a>
+      <a href="/register" class="btn btn-register w-100">Register</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,715 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin Panel{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+  <!-- HEADER -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-0">Admin Panel</h3>
+      <small class="text-muted">Manage staff accounts</small>
+    </div>
+    <button class="btn btn-warning text-white fw-bold" data-bs-toggle="modal" data-bs-target="#addUserModal">
+      <i class="bi bi-person-plus-fill me-1"></i> Add Staff
+    </button>
+  </div>
+
+  <!-- STATS CARDS -->
+  <div class="row mb-4">
+
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card shadow-sm text-center p-3" style="cursor:pointer;" onclick="openCustomerRecords()">
+        <div class="stat-icon mb-1"><i class="bi bi-people-fill" style="font-size:28px; color:#e7c55b;"></i></div>
+        <h4 id="total-customers" class="mb-0">—</h4>
+        <small class="text-muted">Total Customers</small>
+      </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card shadow-sm text-center p-3" style="cursor:pointer;" onclick="openStaffAttendance()">
+        <div class="stat-icon mb-1"><i class="bi bi-person-badge-fill" style="font-size:28px; color:#e7c55b;"></i></div>
+        <h4 id="total-staff" class="mb-0">—</h4>
+        <small class="text-muted">Staff</small>
+      </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card shadow-sm text-center p-3">
+        <div class="stat-icon mb-1"><i class="bi bi-wifi" style="font-size:28px; color:#16a34a;"></i></div>
+        <h4 id="online-staff" class="mb-0">—</h4>
+        <small class="text-muted">Active / Online Staff</small>
+      </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-3">
+      <div class="card shadow-sm text-center p-3">
+        <div class="stat-icon mb-1"><i class="bi bi-person-x-fill" style="font-size:28px; color:#6b7280;"></i></div>
+        <h4 id="offline-staff" class="mb-0">—</h4>
+        <small class="text-muted">Non-active / Offline Staff</small>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge text-bg-info text-dark">Cashier: <span id="count-cashier">0</span></span>
+      <span class="badge text-bg-success">Cook: <span id="count-cook">0</span></span>
+      <span class="badge text-bg-primary">Server: <span id="count-server">0</span></span>
+      <span class="badge text-bg-secondary">General: <span id="count-general">0</span></span>
+    </div>
+  </div>
+
+  <!-- SEARCH + FILTER -->
+  <div class="d-flex gap-2 mb-3">
+    <input type="text" id="searchInput" class="form-control w-25" placeholder="Search staff..." oninput="loadUsers()">
+    <select id="roleFilter" class="form-select" style="max-width: 210px;" onchange="loadUsers()">
+      <option value="all">All Job Roles</option>
+      <option value="cashier">Cashier</option>
+      <option value="cook">Cook</option>
+      <option value="server">Server</option>
+      <option value="general">General</option>
+    </select>
+    <select id="statusFilter" class="form-select" style="max-width: 210px;" onchange="loadUsers()">
+      <option value="all">All Activity Status</option>
+      <option value="online">Active / Online</option>
+      <option value="offline">Non-active / Offline</option>
+    </select>
+  </div>
+
+  <!-- USERS TABLE -->
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead style="background:#f7f3c7;">
+          <tr>
+            <th class="ps-4">Name</th>
+            <th>Username</th>
+            <th>Job Role</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-table-body">
+          <tr><td colspan="6" class="text-center text-muted py-4">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-header fw-semibold">Space Seat Capacity (Admin Control)</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th class="ps-4">Space</th>
+              <th>Total Seats</th>
+              <th>Occupied</th>
+              <th>Seats Left</th>
+              <th class="text-end pe-4">Action</th>
+            </tr>
+          </thead>
+          <tbody id="capacity-table-body">
+            <tr><td colspan="5" class="text-center text-muted py-4">Loading capacities...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Staff Performance Analytics</span>
+      <small class="text-muted">Who catered the most customers/orders</small>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th class="ps-4">Rank</th>
+              <th>Name</th>
+              <th>Job Role</th>
+              <th>Customers Catered</th>
+              <th>Orders Handled</th>
+            </tr>
+          </thead>
+          <tbody id="analytics-table-body">
+            <tr><td colspan="5" class="text-center text-muted py-4">Loading analytics...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- CUSTOMER RECORDS MODAL -->
+<div class="modal fade" id="customerRecordsModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Customer Records</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Order</th>
+                <th>Room</th>
+                <th>Time In</th>
+                <th>Time Out</th>
+              </tr>
+            </thead>
+            <tbody id="customer-records-body">
+              <tr><td colspan="5" class="text-center text-muted py-4">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STAFF ATTENDANCE MODAL -->
+<div class="modal fade" id="staffAttendanceModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Staff Time In/Out</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Time In</th>
+                <th>Time Out</th>
+              </tr>
+            </thead>
+            <tbody id="staff-attendance-body">
+              <tr><td colspan="3" class="text-center text-muted py-4">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+ 
+<!-- ADD USER MODAL -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus-fill me-2 text-warning"></i>Add New Staff</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <input type="text" class="form-control" id="new_full_name" placeholder="e.g. Juan dela Cruz">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-control" id="new_username" placeholder="e.g. juandc">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Job Role</label>
+          <select class="form-select" id="new_job_role">
+            <option value="general">General Staff</option>
+            <option value="cashier">Cashier</option>
+            <option value="cook">Cook</option>
+            <option value="server">Server</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-control" id="new_password" placeholder="Enter password">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-warning text-white fw-bold" onclick="addUser()">Create Staff</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- EDIT USER MODAL -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil-fill me-2 text-warning"></i>Edit Staff</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" id="edit_user_id">
+        <div class="mb-3">
+          <label class="form-label">Full Name</label>
+          <input type="text" class="form-control" id="edit_full_name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-control" id="edit_username">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Job Role</label>
+          <select class="form-select" id="edit_job_role">
+            <option value="general">General Staff</option>
+            <option value="cashier">Cashier</option>
+            <option value="cook">Cook</option>
+            <option value="server">Server</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">New Password <small class="text-muted">(leave blank to keep current)</small></label>
+          <input type="password" class="form-control" id="edit_password" placeholder="Enter new password">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-warning text-white fw-bold" onclick="saveEditUser()">Save Changes</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+
+// LOAD USERS
+function loadUsers() {
+
+  fetch("/api/admin/users", { credentials: "include" })
+  .then(res => res.json())
+  .then(data => {
+    if (!Array.isArray(data)) {
+      document.getElementById("users-table-body").innerHTML =
+        `<tr><td colspan="6" class="text-center text-danger py-4">Failed to load staff.</td></tr>`;
+      return;
+    }
+
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const roleFilter = document.getElementById("roleFilter").value;
+    const statusFilter = document.getElementById("statusFilter").value;
+    let filtered = data.filter(u => {
+      const matchSearch = u.name.toLowerCase().includes(search) || u.username.toLowerCase().includes(search);
+      const matchRole = roleFilter === "all" ? true : (u.job_role || "general").toLowerCase() === roleFilter;
+      const matchStatus = statusFilter === "all"
+        ? true
+        : (statusFilter === "online" ? !!u.is_online : !u.is_online);
+      return matchSearch && matchRole && matchStatus;
+    });
+
+    const roleRank = { cashier: 1, cook: 2, server: 3, general: 4 };
+    filtered.sort((a, b) => {
+      const roleA = (a.job_role || "general").toLowerCase();
+      const roleB = (b.job_role || "general").toLowerCase();
+      const rankA = roleRank[roleA] || 99;
+      const rankB = roleRank[roleB] || 99;
+      if (rankA !== rankB) return rankA - rankB;
+      if ((a.is_online ? 1 : 0) !== (b.is_online ? 1 : 0)) return (b.is_online ? 1 : 0) - (a.is_online ? 1 : 0);
+      return a.name.localeCompare(b.name);
+    });
+
+    // Stats
+    const staffOnly = data.filter(u => u.role === "staff");
+    const onlineCount = staffOnly.filter(u => u.is_online).length;
+    document.getElementById("total-staff").textContent = staffOnly.length;
+    document.getElementById("online-staff").textContent = onlineCount;
+    document.getElementById("offline-staff").textContent = staffOnly.length - onlineCount;
+    document.getElementById("count-cashier").textContent = staffOnly.filter(u => (u.job_role || "general").toLowerCase() === "cashier").length;
+    document.getElementById("count-cook").textContent = staffOnly.filter(u => (u.job_role || "general").toLowerCase() === "cook").length;
+    document.getElementById("count-server").textContent = staffOnly.filter(u => (u.job_role || "general").toLowerCase() === "server").length;
+    document.getElementById("count-general").textContent = staffOnly.filter(u => (u.job_role || "general").toLowerCase() === "general").length;
+
+    const tbody = document.getElementById("users-table-body");
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No staff found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(u => `
+      <tr>
+        <td class="ps-4 fw-semibold">${u.name}</td>
+        <td class="text-muted">@${u.username}</td>
+        <td>${jobRoleBadge(u.job_role)}</td>
+        <td>${statusBadge(u.is_online)}</td>
+        <td class="text-muted" style="font-size:13px;">${u.created_at || "—"}</td>
+        <td class="text-end pe-4">
+          <button
+            class="btn btn-sm btn-outline-warning me-1"
+            onclick="openEdit(${u.id}, decodeURIComponent(this.getAttribute('data-name')), decodeURIComponent(this.getAttribute('data-username')), decodeURIComponent(this.getAttribute('data-job-role')))"
+            data-name="${encodeURIComponent(u.name)}"
+            data-username="${encodeURIComponent(u.username)}"
+            data-job-role="${encodeURIComponent(u.job_role || 'general')}"
+          >
+            <i class="bi bi-pencil-fill"></i>
+          </button>
+          <button
+            class="btn btn-sm btn-outline-danger"
+            onclick="deleteUser(${u.id}, decodeURIComponent(this.getAttribute('data-name')))"
+            data-name="${encodeURIComponent(u.name)}"
+          >
+            <i class="bi bi-trash-fill"></i>
+          </button>
+        </td>
+      </tr>
+    `).join("");
+
+  })
+  .catch(() => {
+    document.getElementById("users-table-body").innerHTML =
+      `<tr><td colspan="6" class="text-center text-danger py-4">Failed to load staff.</td></tr>`;
+  });
+}
+
+function loadCustomerStats() {
+  fetch("/api/admin/customer-records", { credentials: "include" })
+  .then(res => res.json())
+  .then(data => {
+    if (Array.isArray(data)) {
+      document.getElementById("total-customers").textContent = data.length;
+    }
+  })
+  .catch(() => {
+    document.getElementById("total-customers").textContent = "—";
+  });
+}
+
+function openCustomerRecords() {
+  fetch("/api/admin/customer-records", { credentials: "include" })
+  .then(res => res.json())
+  .then(data => {
+    const body = document.getElementById("customer-records-body");
+    if (!Array.isArray(data) || !data.length) {
+      body.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No customer records yet.</td></tr>`;
+    } else {
+      body.innerHTML = data.map(r => `
+        <tr>
+          <td>${r.name}</td>
+          <td>${r.orders}</td>
+          <td>${r.room}</td>
+          <td>${r.time_in}</td>
+          <td>${r.time_out}</td>
+        </tr>
+      `).join("");
+    }
+
+    new bootstrap.Modal(document.getElementById("customerRecordsModal")).show();
+  })
+  .catch(() => {
+    showToast("Failed to load customer records.", "error");
+  });
+}
+
+function openStaffAttendance() {
+  fetch("/api/admin/staff-attendance", { credentials: "include" })
+  .then(res => res.json())
+  .then(data => {
+    const body = document.getElementById("staff-attendance-body");
+    if (!Array.isArray(data) || !data.length) {
+      body.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-4">No staff attendance records yet.</td></tr>`;
+    } else {
+      body.innerHTML = data.map(r => `
+        <tr>
+          <td>${r.name}</td>
+          <td>${r.time_in}</td>
+          <td>${r.time_out}</td>
+        </tr>
+      `).join("");
+    }
+
+    new bootstrap.Modal(document.getElementById("staffAttendanceModal")).show();
+  })
+  .catch(() => {
+    showToast("Failed to load staff attendance records.", "error");
+  });
+}
+
+function loadStaffAnalytics() {
+  fetch("/api/admin/staff-analytics", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+      const tbody = document.getElementById("analytics-table-body");
+      if (!Array.isArray(data) || !data.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No analytics data yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.map((row, idx) => {
+        const rankBadge = idx === 0
+          ? `<span class="badge text-bg-warning text-dark">#1</span>`
+          : `<span class="badge text-bg-light border text-dark">#${idx + 1}</span>`;
+        return `
+          <tr>
+            <td class="ps-4">${rankBadge}</td>
+            <td class="fw-semibold">${row.name}</td>
+            <td>${jobRoleBadge(row.job_role)}</td>
+            <td>${row.customers_count}</td>
+            <td>${row.orders_count}</td>
+          </tr>
+        `;
+      }).join("");
+    })
+    .catch(() => {
+      const tbody = document.getElementById("analytics-table-body");
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Failed to load analytics.</td></tr>`;
+    });
+}
+
+function loadCapacity() {
+  fetch("/api/admin/space-capacity", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+      const tbody = document.getElementById("capacity-table-body");
+      if (!Array.isArray(data) || !data.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No spaces found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.map(s => `
+        <tr>
+          <td class="ps-4 fw-semibold">${s.name}</td>
+          <td style="max-width:130px;">
+            <input type="number" class="form-control form-control-sm" min="1" id="cap-input-${s.id}" value="${s.capacity ?? ""}">
+          </td>
+          <td>${s.occupied_seats ?? 0}</td>
+          <td>${s.seats_left ?? "—"}</td>
+          <td class="text-end pe-4">
+            <button class="btn btn-sm btn-outline-primary" onclick="saveCapacity(${s.id})">Save</button>
+          </td>
+        </tr>
+      `).join("");
+    })
+    .catch(() => {
+      document.getElementById("capacity-table-body").innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Failed to load capacities.</td></tr>`;
+    });
+}
+
+function saveCapacity(spaceId) {
+  const input = document.getElementById(`cap-input-${spaceId}`);
+  if (!input) return;
+  const capacity = parseInt(input.value, 10);
+  if (!capacity || capacity <= 0) {
+    showToast("Capacity must be greater than 0.", "error");
+    return;
+  }
+
+  fetch(`/api/admin/space-capacity/${spaceId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ capacity })
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.error) {
+        showToast(data.error, "error");
+        return;
+      }
+      showToast("Space capacity updated.", "success");
+      loadCapacity();
+    })
+    .catch(() => showToast("Failed to update capacity.", "error"));
+}
+
+
+// ROLE BADGE (auth role)
+function roleBadge(role) {
+  const r = (role || "").toLowerCase();
+  if (r === "admin") {
+    return `<span class="badge bg-danger text-capitalize">admin</span>`;
+  }
+  return `<span class="badge bg-warning text-capitalize">staff</span>`;
+}
+
+// JOB ROLE BADGE
+function jobRoleBadge(jr) {
+  const map = {
+    cashier: "bg-info text-dark",
+    cook:    "bg-success",
+    server:  "bg-primary",
+    general: "bg-secondary"
+  };
+  const cls = map[(jr || "general").toLowerCase()] || "bg-secondary";
+  return `<span class="badge ${cls} text-capitalize">${jr || "general"}</span>`;
+}
+
+function statusBadge(isOnline) {
+  return isOnline
+    ? `<span class="badge bg-success">Online</span>`
+    : `<span class="badge bg-secondary">Offline</span>`;
+}
+
+
+// ADD USER
+function addUser() {
+
+  const full_name = document.getElementById("new_full_name").value.trim();
+  const username  = document.getElementById("new_username").value.trim();
+  const password  = document.getElementById("new_password").value;
+
+  if (!full_name || !username || !password) {
+    showToast("Please fill in all fields.", "error");
+    return;
+  }
+
+  fetch("/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ full_name, username, role: "staff",
+      job_role: document.getElementById("new_job_role").value, password })
+  })
+  .then(res => res.json().then(data => ({ status: res.status, data })))
+  .then(({ status, data }) => {
+    if (!data.message || status >= 400) { 
+      showToast(data.error || "Failed to create user.", "error"); 
+      return; 
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById("addUserModal")).hide();
+    document.getElementById("new_full_name").value = "";
+    document.getElementById("new_username").value  = "";
+    document.getElementById("new_password").value  = "";
+    document.getElementById("new_job_role").value  = "general";
+    showToast("Staff created successfully!", "success");
+    loadUsers();
+  })
+  .catch((err) => {
+    console.error("Add staff error:", err);
+    showToast("Failed to create staff. Please try again.", "error");
+  });
+}
+
+
+// OPEN EDIT
+function openEdit(id, name, username, jobRole) {
+  document.getElementById("edit_user_id").value    = id;
+  document.getElementById("edit_full_name").value  = name;
+  document.getElementById("edit_username").value   = username;
+  document.getElementById("edit_password").value   = "";
+  document.getElementById("edit_job_role").value   = jobRole || "general";
+
+  new bootstrap.Modal(document.getElementById("editUserModal")).show();
+}
+
+
+// SAVE EDIT
+function saveEditUser() {
+
+  const id        = document.getElementById("edit_user_id").value;
+  const full_name = document.getElementById("edit_full_name").value.trim();
+  const username  = document.getElementById("edit_username").value.trim();
+  const password  = document.getElementById("edit_password").value;
+
+  const payload = { full_name, username, role: "staff",
+    job_role: document.getElementById("edit_job_role").value };
+  if (password) payload.password = password;
+
+  fetch(`/api/admin/users/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json().then(data => ({ status: res.status, data })))
+  .then(({ status, data }) => {
+    if (data.error || status >= 400) { 
+      showToast(data.error || "Failed to update user.", "error"); 
+      return; 
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById("editUserModal")).hide();
+    showToast("Staff updated successfully!", "success");
+    loadUsers();
+  })
+  .catch((err) => {
+    console.error("Edit staff error:", err);
+    showToast("Failed to update staff. Please try again.", "error");
+  });
+}
+
+
+// DELETE USER
+function deleteUser(id, name) {
+  if (!confirm(`Delete staff "${name}"? This cannot be undone.`)) return;
+
+  fetch(`/api/admin/users/${id}`, {
+    method: "DELETE",
+    credentials: "include"
+  })
+    .then(async res => {
+      // Error pages may not be JSON (e.g. 405 HTML). Try JSON first, then fall back to text.
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        try {
+          const text = await res.text();
+          data = { error: text || `Request failed with status ${res.status}` };
+        } catch {
+          data = { error: `Request failed with status ${res.status}` };
+        }
+      }
+
+      if (!res.ok) {
+        showToast(data && data.error ? data.error : `Request failed with status ${res.status}`, "error");
+        return;
+      }
+
+      if (data && data.error) {
+        showToast(data.error, "error");
+        return;
+      }
+
+      showToast(`Staff "${name}" deleted successfully.`, "success");
+      loadUsers();
+    })
+    .catch(() => {
+      showToast("Failed to delete staff. Please try again.", "error");
+    });
+}
+
+
+// INIT
+loadUsers();
+loadCustomerStats();
+loadStaffAnalytics();
+loadCapacity();
+setInterval(loadUsers, 15000);
+setInterval(loadStaffAnalytics, 15000);
+setInterval(loadCapacity, 20000);
+
+</script>
+{% endblock %}

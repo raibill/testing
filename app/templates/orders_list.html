@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+
+{% block title %}Orders{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0">Orders</h3>
+      <small id="orders-count" class="text-muted">0 sessions</small>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Space</th>
+            <th>Time In</th>
+            <th>Items</th>
+            <th>Status</th>
+            <th>Food Total</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody id="orders-list-container">
+          <tr><td colspan="7" class="text-center text-muted py-4">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadOrdersList() {
+  fetch("/api/orders-list", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById("orders-list-container");
+      
+      if (!Array.isArray(data)) {
+        container.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Failed to load orders. Please refresh the page.</td></tr>`;
+        return;
+      }
+      
+      document.getElementById("orders-count").innerText = `${data.length} session(s)`;
+
+      if (!data.length) {
+        container.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No orders found.</td></tr>`;
+        return;
+      }
+
+      container.innerHTML = data.map(r => `
+        <tr>
+          <td>${r.customer_name}</td>
+          <td>${r.space_type}</td>
+          <td>${r.time_in}</td>
+          <td>${r.orders_count}</td>
+          <td>${r.active_order_status === "preparin" ? "preparing" : (r.active_order_status || "preparing")}</td>
+          <td>₱${r.food_total.toFixed(2)}</td>
+          <td class="text-end">
+            <a class="btn btn-primary btn-sm" href="/orders/${r.session_id}">View Orders</a>
+          </td>
+        </tr>
+      `).join("");
+    })
+    .catch(err => {
+      const container = document.getElementById("orders-list-container");
+      container.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">Failed to load orders. Please refresh the page.</td></tr>`;
+    });
+}
+
+loadOrdersList();
+setInterval(loadOrdersList, 5000);
+</script>
+{% endblock %}
+

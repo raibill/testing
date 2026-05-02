@@ -1,0 +1,490 @@
+{% extends "layout.html" %}
+{% block title %}Boardroom Booking{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <style>
+    .boardroom-shell .card { border: 0; border-radius: 14px; }
+    .boardroom-shell .card-header { background: #fff; border-bottom: 1px solid #eef0f4; }
+    .legend-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    }
+    .legend-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .slot-available { background:#dcfce7; color:#15803d; border:1px solid #86efac; }
+    .slot-booked { background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; }
+    .slot-active { background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd; }
+  </style>
+  <div class="boardroom-shell">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0">Boardroom Booking</h3>
+      <small id="booking-count" class="text-muted">Loading bookings...</small>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <input type="date" id="scheduleDate" class="form-control" style="width:170px;" onchange="loadSchedule()">
+      <button class="btn btn-warning fw-bold text-white" data-bs-toggle="modal" data-bs-target="#bookingModal">
+        <i class="bi bi-calendar-plus me-1"></i> New Booking
+      </button>
+    </div>
+  </div>
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-header fw-semibold">Availability for <span id="schedule-label">—</span></div>
+    <div class="card-body p-2">
+      <div class="d-flex gap-2 flex-wrap px-1 pb-2">
+        <span class="legend-pill" style="background:#ecfdf5;color:#166534;"><span class="legend-dot" style="background:#22c55e;"></span>Available</span>
+        <span class="legend-pill" style="background:#fef2f2;color:#991b1b;"><span class="legend-dot" style="background:#ef4444;"></span>Booked</span>
+        <span class="legend-pill" style="background:#eff6ff;color:#1e40af;"><span class="legend-dot" style="background:#3b82f6;"></span>In Session</span>
+      </div>
+      <div id="schedule-grid" style="display:grid; grid-template-columns: 70px 1fr; gap:3px 6px;"></div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header fw-semibold">Bookings for <span id="list-label">—</span></div>
+    <div class="table-responsive">
+      <table class="table table-striped mb-0">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Time</th>
+            <th>Course</th>
+            <th>People</th>
+            <th>Status</th>
+            <th>Purpose</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="bookings-list"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="bookingModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calendar-check me-2 text-warning"></i>New Boardroom Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="form-control mb-2" id="b-name" placeholder="Customer Name">
+        <input type="date" class="form-control mb-2" id="b-date">
+        <div class="row g-2 mb-1">
+          <div class="col">
+            <label class="form-label small text-muted mb-1">Start Time</label>
+            <div class="d-flex gap-1">
+              <select id="b-start-hour" class="form-select"></select>
+              <select id="b-start-min" class="form-select">
+                <option value="00">00</option>
+                <option value="30">30</option>
+              </select>
+              <select id="b-start-period" class="form-select">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+          <div class="col">
+            <label class="form-label small text-muted mb-1">End Time</label>
+            <div class="d-flex gap-1">
+              <select id="b-end-hour" class="form-select"></select>
+              <select id="b-end-min" class="form-select">
+                <option value="00">00</option>
+                <option value="30">30</option>
+              </select>
+              <select id="b-end-period" class="form-select">
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <small class="text-muted d-block mb-2">Booking hours: 7:00 AM to 10:00 PM</small>
+        <input type="text" class="form-control mb-2" id="b-course" placeholder="Course (optional)">
+        <input type="number" class="form-control mb-2" id="b-people" min="1" placeholder="Number of People">
+        <input type="text" class="form-control" id="b-purpose" placeholder="Purpose (optional)">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-warning fw-bold text-white" onclick="submitBooking()">Save Booking</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="extendModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Extend Boardroom Time</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small text-muted mb-1">Hours</label>
+        <select id="extend-hours" class="form-select mb-2">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+        </select>
+        <label class="form-label small text-muted mb-1">Minutes</label>
+        <select id="extend-minutes" class="form-select">
+          <option value="0">0</option>
+          <option value="15">15</option>
+          <option value="30">30</option>
+          <option value="45">45</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="submitExtend()">Apply Extend</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="actionConfirmModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirm-title">Confirm Action</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="confirm-message">Are you sure?</div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+        <button class="btn btn-danger" id="confirm-ok-btn">Yes</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function fmtDate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+}
+function toMinutes(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function fmt12(hhmm) {
+  const [hRaw, m] = hhmm.split(":").map(Number);
+  const period = hRaw >= 12 ? "PM" : "AM";
+  const h12 = (hRaw % 12) || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+function minutesTo12(totalMinutes) {
+  const h24 = Math.floor(totalMinutes / 60);
+  const min = totalMinutes % 60;
+  return fmt12(`${String(h24).padStart(2, "0")}:${String(min).padStart(2, "0")}`);
+}
+function to24Hour(hour, minute, period) {
+  let h = parseInt(hour, 10);
+  if (period === "AM" && h === 12) h = 0;
+  if (period === "PM" && h !== 12) h += 12;
+  return `${String(h).padStart(2, "0")}:${minute}`;
+}
+function initTimeSelectors() {
+  const minuteOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))
+    .map(m => `<option value="${m}">${m}</option>`)
+    .join("");
+  const hourOptions = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
+    .map(h => `<option value="${h}">${h}</option>`)
+    .join("");
+  document.getElementById("b-start-hour").innerHTML = hourOptions;
+  document.getElementById("b-end-hour").innerHTML = hourOptions;
+  document.getElementById("b-start-min").innerHTML = minuteOptions;
+  document.getElementById("b-end-min").innerHTML = minuteOptions;
+
+  document.getElementById("b-start-hour").value = "07";
+  document.getElementById("b-start-min").value = "00";
+  document.getElementById("b-start-period").value = "AM";
+  document.getElementById("b-end-hour").value = "08";
+  document.getElementById("b-end-min").value = "00";
+  document.getElementById("b-end-period").value = "AM";
+}
+function badgeFor(status) {
+  if (status === "active") return `<span class="badge text-bg-primary">Active</span>`;
+  if (status === "completed") return `<span class="badge text-bg-success">Completed</span>`;
+  if (status === "cancelled") return `<span class="badge text-bg-secondary">Cancelled</span>`;
+  return `<span class="badge text-bg-warning text-dark">Booked</span>`;
+}
+
+document.getElementById("scheduleDate").value = todayStr();
+document.getElementById("b-date").value = todayStr();
+initTimeSelectors();
+
+function loadSchedule() {
+  const date = document.getElementById("scheduleDate").value || todayStr();
+  document.getElementById("schedule-label").textContent = fmtDate(date);
+  document.getElementById("list-label").textContent = fmtDate(date);
+
+  fetch(`/api/lounge-bookings?date=${date}`, { credentials: "include" })
+    .then(r => r.json())
+    .then(bookings => {
+      renderSchedule(bookings);
+      renderList(bookings);
+      document.getElementById("booking-count").textContent = `${bookings.length} booking(s)`;
+    })
+    .catch(() => showToast("Failed to load bookings.", "error"));
+}
+
+function renderSchedule(bookings) {
+  const grid = document.getElementById("schedule-grid");
+  grid.innerHTML = "";
+
+  const DAY_START = 7 * 60;
+  const DAY_END = 22 * 60;
+  const SLOT_MINS = 30;
+
+  for (let m = DAY_START; m < DAY_END; m += SLOT_MINS) {
+    const label = minutesTo12(m);
+    const slotEnd = m + SLOT_MINS;
+
+    const hit = bookings.find(b => {
+      const bs = toMinutes(b.start_time);
+      const be = toMinutes(b.end_time);
+      return bs < slotEnd && be > m && (b.status === "booked" || b.status === "active");
+    });
+
+    const lbl = document.createElement("div");
+    lbl.style.cssText = "font-size:11px;color:#6b7280;text-align:right;padding-top:2px;";
+    lbl.textContent = label;
+
+    const slot = document.createElement("div");
+    const busyStyle = hit && hit.status === "active"
+      ? "background:#dbeafe; color:#1d4ed8; border:1px solid #93c5fd;"
+      : "background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5;";
+    slot.style.cssText = `
+      height:28px;border-radius:5px;display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:500;
+      ${hit ? busyStyle : "background:#dcfce7; color:#15803d; border:1px solid #86efac;"}
+    `;
+    slot.textContent = hit
+      ? `${hit.status === "active" ? "● In Session" : "⛔ Booked"} ${hit.customer_name} (${fmt12(hit.start_time)}-${fmt12(hit.end_time)})`
+      : "✓ Available";
+
+    grid.appendChild(lbl);
+    grid.appendChild(slot);
+  }
+}
+
+function renderList(bookings) {
+  const tbody = document.getElementById("bookings-list");
+  if (!bookings.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No bookings for this date.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = bookings.map(b => {
+    let actions = "";
+    if (b.status === "booked" && b.can_start) {
+      actions += `<button class="btn btn-sm btn-primary me-1" onclick="startBooking(${b.id})">Start Session</button>`;
+    }
+    if (b.status === "active") {
+      actions += `<button class="btn btn-sm btn-outline-primary me-1" onclick="extendBooking(${b.id})">Extend</button>`;
+      actions += `<button class="btn btn-sm btn-outline-success me-1" onclick="goToOrder(${b.session_id})">Order</button>`;
+      actions += `<button class="btn btn-sm btn-outline-warning" onclick="goToCheckout(${b.session_id})">Checkout</button>`;
+    }
+    if (b.status === "booked") {
+      actions += `<button class="btn btn-sm btn-outline-danger" onclick="cancelBooking(${b.id})">Cancel</button>`;
+    }
+    if (!actions) actions = `<span class="text-muted">No action</span>`;
+
+    const purposeText = b.purpose || "N/A";
+    return `
+      <tr>
+        <td>${b.customer_name}</td>
+        <td>${fmt12(b.start_time)} - ${fmt12(b.end_time)}</td>
+        <td>${b.course || "N/A"}</td>
+        <td>${b.number_of_people}</td>
+        <td>${badgeFor(b.status)}</td>
+        <td>${purposeText}</td>
+        <td class="text-end">${actions}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function submitBooking() {
+  const startTime = to24Hour(
+    document.getElementById("b-start-hour").value,
+    document.getElementById("b-start-min").value,
+    document.getElementById("b-start-period").value
+  );
+  const endTime = to24Hour(
+    document.getElementById("b-end-hour").value,
+    document.getElementById("b-end-min").value,
+    document.getElementById("b-end-period").value
+  );
+
+  const payload = {
+    customer_name: document.getElementById("b-name").value.trim(),
+    date: document.getElementById("b-date").value,
+    start_time: startTime,
+    end_time: endTime,
+    course: document.getElementById("b-course").value.trim(),
+    number_of_people: document.getElementById("b-people").value,
+    purpose: document.getElementById("b-purpose").value.trim()
+  };
+
+  if (!payload.customer_name || !payload.date || !payload.start_time || !payload.end_time || !payload.number_of_people) {
+    showToast("Please fill in all required fields.", "error");
+    return;
+  }
+  const startMins = toMinutes(payload.start_time);
+  const endMins = toMinutes(payload.end_time);
+  if (startMins < 7 * 60 || endMins > 22 * 60) {
+    showToast("Booking must be within 7:00 AM to 10:00 PM.", "error");
+    return;
+  }
+  if (endMins <= startMins) {
+    showToast("End time must be after start time.", "error");
+    return;
+  }
+
+  fetch("/api/book-lounge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, "error");
+      return;
+    }
+    showToast("Boardroom booking saved.", "success");
+    bootstrap.Modal.getInstance(document.getElementById("bookingModal")).hide();
+    document.getElementById("scheduleDate").value = payload.date;
+    ["b-name", "b-course", "b-people", "b-purpose"].forEach(id => document.getElementById(id).value = "");
+    initTimeSelectors();
+    loadSchedule();
+  })
+  .catch(() => showToast("Failed to create booking.", "error"));
+}
+
+function startBooking(id) {
+  fetch(`/api/lounge-bookings/${id}/start`, {
+    method: "POST",
+    credentials: "include"
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, "error");
+      return;
+    }
+    showToast("Session started and moved to active customers.", "success");
+    loadSchedule();
+  })
+  .catch(() => showToast("Failed to start session.", "error"));
+}
+
+let extendBookingId = null;
+let pendingConfirmAction = null;
+
+function openConfirmModal(title, message, onConfirm) {
+  document.getElementById("confirm-title").textContent = title;
+  document.getElementById("confirm-message").textContent = message;
+  pendingConfirmAction = onConfirm;
+  const modal = new bootstrap.Modal(document.getElementById("actionConfirmModal"));
+  modal.show();
+}
+
+document.getElementById("confirm-ok-btn").addEventListener("click", () => {
+  const modalEl = document.getElementById("actionConfirmModal");
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+  if (typeof pendingConfirmAction === "function") pendingConfirmAction();
+  pendingConfirmAction = null;
+});
+
+function extendBooking(id) {
+  extendBookingId = id;
+  document.getElementById("extend-hours").value = "0";
+  document.getElementById("extend-minutes").value = "15";
+  const modal = new bootstrap.Modal(document.getElementById("extendModal"));
+  modal.show();
+}
+
+function submitExtend() {
+  if (!extendBookingId) return;
+  const hours = parseInt(document.getElementById("extend-hours").value, 10) || 0;
+  const mins = parseInt(document.getElementById("extend-minutes").value, 10) || 0;
+  const minutes = (hours * 60) + mins;
+  if (minutes <= 0) {
+    showToast("Please select a valid extend time.", "error");
+    return;
+  }
+
+  fetch(`/api/lounge-bookings/${extendBookingId}/extend`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ minutes })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) {
+      showToast(data.error, "error");
+      return;
+    }
+    showToast(`Booking extended to ${fmt12(data.end_time)}.`, "success");
+    const modal = bootstrap.Modal.getInstance(document.getElementById("extendModal"));
+    if (modal) modal.hide();
+    extendBookingId = null;
+    loadSchedule();
+  })
+  .catch(() => showToast("Failed to extend booking.", "error"));
+}
+
+function cancelBooking(id) {
+  openConfirmModal(
+    "Cancel Booking",
+    "Are you sure you want to cancel this booking?",
+    () => {
+      fetch(`/api/lounge-bookings/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          showToast(data.error, "error");
+          return;
+        }
+        showToast("Booking cancelled.", "success");
+        loadSchedule();
+      })
+      .catch(() => showToast("Failed to cancel booking.", "error"));
+    }
+  );
+}
+
+function goToOrder(sessionId) {
+  window.location.href = `/order/${sessionId}`;
+}
+
+function goToCheckout(sessionId) {
+  window.location.href = "/dashboard";
+  setTimeout(() => showToast(`Open View Order for session #${sessionId} to checkout.`, "info"), 300);
+}
+
+loadSchedule();
+setInterval(loadSchedule, 15000);
+</script>
+{% endblock %}

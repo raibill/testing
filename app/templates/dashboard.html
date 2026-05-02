@@ -1,0 +1,459 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+        <div>
+            <h3 class="mb-0">Active Customer Sessions</h3>
+            <small id="session-count" class="text-muted">0 customers</small>
+        </div>
+
+        <input 
+            type="text" 
+            id="searchInput" 
+            class="form-control w-25" 
+            placeholder="Search customer..."
+            oninput="loadSessions()"
+        >
+
+    </div>
+
+    <div class="row mb-3" id="space-availability-cards">
+      <div class="col-md-6 mb-2">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1">Regular Lounge Seats</h6>
+                <small class="text-muted" id="regular-summary">Loading...</small>
+              </div>
+              <span class="badge text-bg-success" id="regular-left">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <h6 class="mb-1">Premium Lounge Seats</h6>
+                <small class="text-muted" id="premium-summary">Loading...</small>
+              </div>
+              <span class="badge text-bg-warning text-dark" id="premium-left">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead style="background:#f7f3c7;">
+            <tr>
+              <th>Customer</th>
+              <th>School</th>
+              <th>Course</th>
+              <th>Purpose</th>
+              <th>Space</th>
+              <th>Time In</th>
+              <th>Duration</th>
+              <th>Current Bill</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sessions-container">
+            <tr><td colspan="9" class="text-center text-muted py-4">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+</div>
+
+<!-- RECEIPT MODAL -->
+<div class="modal fade" id="receiptModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">Order Summary</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body" id="receipt-body"></div>
+
+      <div class="modal-footer d-flex justify-content-between">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-success" id="confirmCheckoutBtn">Checkout</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- CHECK-IN MODAL -->
+<div class="modal fade" id="checkinModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title">New Customer Check-in</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+
+        <input type="text" id="customerName" class="form-control mb-2" placeholder="Customer Name">
+        <input type="text" id="school" class="form-control mb-2" placeholder="School">
+        <input type="text" id="course" class="form-control mb-2" placeholder="Course">
+        <input type="number" id="numberOfPeople" class="form-control mb-2" placeholder="Number of People" min="1" value="1">
+
+        <select id="spaceType" class="form-control">
+            <option value="1">Regular Lounge</option>
+            <option value="2">Premium Lounge</option>
+            <option value="3">Boardroom</option>
+        </select>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" onclick="checkinCustomer()">Check In</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FLOATING ADD BUTTON -->
+<button id="floatingAddBtn"
+    class="btn btn-success"
+    data-bs-toggle="modal"
+    data-bs-target="#checkinModal">
+    +
+</button>
+
+{% endblock %}
+
+
+{% block scripts %}
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+
+let currentFilter = "all";
+
+// FILTER
+function setFilter(spaceType, btn) {
+    currentFilter = spaceType;
+
+    document.querySelectorAll(".space-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    loadSessions();
+}
+
+// Set filter from URL query
+(function initFilterFromQuery() {
+    const selected = new URLSearchParams(window.location.search).get("space");
+    if (selected) {
+        currentFilter = selected;
+    }
+})();
+
+
+// FORMAT TIME
+function formatTime(seconds) {
+    let hrs = Math.floor(seconds / 3600);
+    let mins = Math.floor((seconds % 3600) / 60);
+    let secs = seconds % 60;
+
+    return `${hrs.toString().padStart(2, '0')}:` +
+           `${mins.toString().padStart(2, '0')}:` +
+           `${secs.toString().padStart(2, '0')}`;
+}
+
+
+// CHECK-IN
+function checkinCustomer() {
+
+    let name = document.getElementById("customerName").value;
+    let school = document.getElementById("school").value;
+    let course = document.getElementById("course").value;
+    let spaceType = document.getElementById("spaceType").value;
+
+    if (!name) {
+        showToast("Customer name is required.", "error");
+        return;
+    }
+
+    fetch("/api/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+            customer_name: name,
+            school: school,
+            course: course,
+            number_of_people: parseInt(document.getElementById("numberOfPeople").value || "1", 10),
+            space_type_id: parseInt(spaceType)
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, "error");
+            return;
+        }
+
+        let modal = bootstrap.Modal.getInstance(document.getElementById('checkinModal'));
+        modal.hide();
+
+        document.getElementById("customerName").value = "";
+        document.getElementById("school").value = "";
+        document.getElementById("course").value = "";
+        document.getElementById("numberOfPeople").value = "1";
+
+        showToast("Customer checked in successfully!", "success");
+        loadSessions();
+        loadSpaceAvailability();
+    })
+    .catch(err => {
+        showToast("Failed to check in customer. Please try again.", "error");
+    });
+}
+
+function loadSpaceAvailability() {
+    fetch("/api/space-availability", { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const regular = data.find(x => x.space_name === "Regular Lounge");
+        const premium = data.find(x => x.space_name === "Premium Lounge");
+
+        if (regular) {
+          const left = regular.seats_left ?? 0;
+          document.getElementById("regular-left").textContent = `${left} left`;
+          document.getElementById("regular-summary").textContent = `${regular.occupied}/${regular.capacity} occupied`;
+          document.getElementById("regular-left").className = `badge ${left <= 5 ? "text-bg-danger" : "text-bg-success"}`;
+        }
+        if (premium) {
+          const left = premium.seats_left ?? 0;
+          document.getElementById("premium-left").textContent = `${left} left`;
+          document.getElementById("premium-summary").textContent = `${premium.occupied}/${premium.capacity} occupied`;
+          document.getElementById("premium-left").className = `badge ${left <= 5 ? "text-bg-danger" : "text-bg-warning text-dark"}`;
+        }
+      })
+      .catch(() => {});
+}
+
+
+// NAVIGATION
+function goToOrder(sessionId) {
+    window.location.href = `/order/${sessionId}`;
+}
+
+
+// VOID ITEM
+function voidItem(itemId, sessionId) {
+
+    if (!confirm("Remove this item?")) return;
+
+    fetch(`/api/void-item/${itemId}`, {
+        method: "DELETE",
+        credentials: "include"
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.error) {
+            showToast(data.error, "error");
+            return;
+        }
+        showToast("Item removed successfully.", "success");
+        setTimeout(() => viewOrder(sessionId), 200);
+    })
+    .catch(err => {
+        showToast("Failed to remove item. Please try again.", "error");
+    });
+}
+
+
+// VIEW ORDER
+function viewOrder(sessionId) {
+
+    fetch(`/api/session-orders/${sessionId}?include_done=1`, { credentials: "include" })
+    .then(res => res.json())
+    .then(orderData => {
+
+        fetch(`/api/preview-checkout/${sessionId}`, { credentials: "include" })
+        .then(res => res.json())
+        .then(data => {
+
+            let itemsHTML = "";
+
+            orderData.orders.forEach(item => {
+                const canVoid = item.order_status !== "done";
+                itemsHTML += `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            ${item.item_name} x${item.quantity}
+                            <br>
+                            <small>₱${item.total.toFixed(2)}</small>
+                        </div>
+                        ${canVoid ? `
+                            <button class="btn btn-sm btn-danger"
+                                onclick="voidItem(${item.id}, ${sessionId})">
+                                Void
+                            </button>
+                        ` : ``}
+                    </div>
+                `;
+            });
+
+            if (!itemsHTML) itemsHTML = "<p>No orders</p>";
+
+            document.getElementById("receipt-body").innerHTML = `
+                <div style="text-align:center;">
+                    <h4>IdeaHub</h4>
+                    <hr>
+                </div>
+
+                <p><strong>Customer:</strong> ${data.customer_name}</p>
+                <p><strong>Time Used:</strong> ${formatTime(Math.floor(data.minutes_used * 60))}</p>
+
+                <hr>
+                <h6>Orders:</h6>
+                ${itemsHTML}
+                <hr>
+
+                <p><strong>Time Bill:</strong> ₱${data.time_bill.toFixed(2)}</p>
+                <p><strong>Food Bill:</strong> ₱${data.food_bill.toFixed(2)}</p>
+
+                <hr>
+                <h5>Total: ₱${data.total_bill.toFixed(2)}</h5>
+            `;
+
+            let modal = new bootstrap.Modal(document.getElementById('receiptModal'));
+            modal.show();
+
+            document.getElementById("confirmCheckoutBtn").onclick = function () {
+
+                if (!confirm("Are you sure you want to checkout this customer?")) return;
+
+                fetch(`/api/checkout/${sessionId}`, {
+                    method: "POST",
+                    credentials: "include"
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        showToast(data.error, "error");
+                        return;
+                    }
+                    bootstrap.Modal.getInstance(document.getElementById('receiptModal')).hide();
+                    showToast("Customer checked out successfully.", "success");
+                    loadSessions();
+                })
+                .catch(err => {
+                    showToast("Failed to checkout customer. Please try again.", "error");
+                });
+            };
+
+        })
+        .catch(err => {
+            showToast("Failed to load checkout preview. Please try again.", "error");
+        });
+
+    })
+    .catch(err => {
+        showToast("Failed to load order details. Please try again.", "error");
+    });
+}
+
+
+// LOAD SESSIONS
+function loadSessions() {
+
+    fetch("/api/active-sessions", { credentials: "include" })
+    .then(res => res.json())
+    .then(data => {
+        if (!Array.isArray(data)) {
+            showToast("Failed to load sessions. Please refresh the page.", "error");
+            return;
+        }
+
+        let container = document.getElementById("sessions-container");
+        let search = document.getElementById("searchInput").value.toLowerCase();
+
+        container.innerHTML = "";
+
+        let visibleCount = 0;
+
+        data.forEach(session => {
+
+            if (currentFilter !== "all" && session.space_type !== currentFilter) return;
+
+            if (!session.customer_name.toLowerCase().includes(search)) return;
+
+            visibleCount++;
+
+            container.innerHTML += `
+                <tr>
+                    <td>${session.customer_name}</td>
+                    <td>${session.school || "N/A"}</td>
+                    <td>${session.course || "N/A"}</td>
+                    <td>${session.space_type === "Boardroom" ? (session.purpose || "N/A") : "—"}</td>
+                    <td>${session.space_type}</td>
+                    <td>${session.time_in}</td>
+                    <td>${formatTime(session.seconds_used)}</td>
+                    <td>₱${session.current_bill.toFixed(2)}</td>
+                    <td class="text-end">
+                        <button class="btn btn-primary btn-sm me-1"
+                            onclick="goToOrder(${session.session_id})">
+                            Add Order
+                        </button>
+                        <button class="btn btn-warning btn-sm"
+                            onclick="viewOrder(${session.session_id})">
+                            View Order
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        document.getElementById("session-count").innerText = `${visibleCount} customer(s)`;
+        if (visibleCount === 0) {
+            container.innerHTML = `<tr><td colspan="9" class="text-center text-muted py-4">There is no customer at the moment.</td></tr>`;
+        }
+
+    })
+    .catch(err => {
+        let container = document.getElementById("sessions-container");
+        container.innerHTML = `<tr><td colspan="9" class="text-center text-danger py-4">Failed to load sessions. Please refresh the page.</td></tr>`;
+    });
+}
+
+// REALTIME UPDATES
+const socket = io();
+socket.on("session_checked_out", function () {
+    loadSessions();
+});
+
+
+// INIT
+loadSessions();
+loadSpaceAvailability();
+setInterval(loadSessions, 5000);
+setInterval(loadSpaceAvailability, 5000);
+
+</script>
+
+{% endblock %}
+

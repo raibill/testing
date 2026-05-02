@@ -1,0 +1,183 @@
+{% extends "layout.html" %}
+
+{% block title %}Checkout Records{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-0">Checkout Records</h3>
+      <small id="checkout-count" class="text-muted">0 records</small>
+    </div>
+    <!-- Search + Date filters -->
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+      <input
+        type="text"
+        id="checkoutSearch"
+        class="form-control"
+        style="width:180px;"
+        placeholder="Search customer..."
+        oninput="loadCheckoutRecords()"
+      >
+      <input
+        type="date"
+        id="dateFrom"
+        class="form-control"
+        style="width:150px;"
+        oninput="loadCheckoutRecords()"
+        title="From date"
+      >
+      <span class="text-muted">–</span>
+      <input
+        type="date"
+        id="dateTo"
+        class="form-control"
+        style="width:150px;"
+        oninput="loadCheckoutRecords()"
+        title="To date"
+      >
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Records rendered here, grouped by month -->
+  <div id="checkout-records-container">
+    <p class="text-center text-muted py-4">Loading...</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+function formatTime(seconds) {
+  if (seconds === null || seconds === undefined) return "N/A";
+  const s = Number(seconds);
+  const hrs  = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  return `${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+}
+
+// Format "YYYY-MM" → "January 2026"
+function monthLabel(yearMonth) {
+  const [y, m] = yearMonth.split("-").map(Number);
+  const d = new Date(y, m - 1, 1);
+  return d.toLocaleString("en-US", { month: "long", year: "numeric" });
+}
+
+function clearFilters() {
+  document.getElementById("checkoutSearch").value = "";
+  document.getElementById("dateFrom").value = "";
+  document.getElementById("dateTo").value   = "";
+  loadCheckoutRecords();
+}
+
+function loadCheckoutRecords() {
+  const search   = document.getElementById("checkoutSearch").value.toLowerCase().trim();
+  const dateFrom = document.getElementById("dateFrom").value;
+  const dateTo   = document.getElementById("dateTo").value;
+
+  // Build query string — backend filters by date, we filter by name client-side
+  let url = "/api/checkout-records";
+  const params = new URLSearchParams();
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo)   params.set("date_to",   dateTo);
+  if (params.toString()) url += "?" + params.toString();
+
+  fetch(url, { credentials: "include" })
+  .then(res => res.json())
+  .then(data => {
+    const container = document.getElementById("checkout-records-container");
+
+    if (!Array.isArray(data)) {
+      container.innerHTML = `<p class="text-center text-danger py-4">Failed to load checkout records. Please refresh the page.</p>`;
+      return;
+    }
+
+    // Client-side name filter
+    const filtered = search
+      ? data.filter(r => r.customer_name.toLowerCase().includes(search))
+      : data;
+
+    document.getElementById("checkout-count").innerText = `${filtered.length} record(s)`;
+
+    if (!filtered.length) {
+      container.innerHTML = `<p class="text-center text-muted py-4">No checkout records found.</p>`;
+      return;
+    }
+
+    // --- Group by YYYY-MM (derived from created_date) ---
+    const groups = {};
+    for (const record of filtered) {
+      // created_date is "YYYY-MM-DD"; fall back to parsing time_in if absent
+      const raw = record.created_date || "";
+      const key = raw.length >= 7 ? raw.slice(0, 7) : "Unknown";
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(record);
+    }
+
+    // Sort groups newest-first
+    const sortedKeys = Object.keys(groups).sort((a, b) => b.localeCompare(a));
+
+    let html = "";
+    for (const key of sortedKeys) {
+      const label   = key === "Unknown" ? "Unknown Date" : monthLabel(key);
+      const records = groups[key];
+
+      html += `
+        <div class="mb-4">
+          <h6 class="text-muted fw-semibold mb-2 border-bottom pb-1">${label}</h6>
+          <div class="card shadow-sm">
+            <div class="table-responsive">
+              <table class="table table-striped mb-0">
+                <thead>
+                  <tr>
+                    <th>Customer</th>
+                    <th>Space</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Time Spent</th>
+                    <th>Time Bill</th>
+                    <th>Food Bill</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${records.map(record => `
+                    <tr>
+                      <td>${record.customer_name}</td>
+                      <td>${record.space_type}</td>
+                      <td>${record.time_in}</td>
+                      <td>${record.time_out}</td>
+                      <td>${formatTime(record.seconds_spent)}</td>
+                      <td>₱${record.time_bill.toFixed(2)}</td>
+                      <td>₱${record.food_bill.toFixed(2)}</td>
+                      <td><strong>₱${record.total_bill.toFixed(2)}</strong></td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html;
+  })
+  .catch(() => {
+    document.getElementById("checkout-records-container").innerHTML =
+      `<p class="text-center text-danger py-4">Failed to load checkout records. Please refresh the page.</p>`;
+  });
+}
+
+const socket = io();
+socket.on("session_checked_out", function () {
+  loadCheckoutRecords();
+});
+
+loadCheckoutRecords();
+setInterval(loadCheckoutRecords, 10000);
+</script>
+{% endblock %}
